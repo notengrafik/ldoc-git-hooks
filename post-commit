@@ -36,6 +36,9 @@ then
   errors=$(ldoc -iq "$tmpCurrentCommitDir" 2>&1 >/dev/null)
   if [ "$errors" ]
   then
+    # The errors contain paths of the temporarily cloned repo. We remove that
+    # temporary directory info to avoid confusion.
+    errors=$(echo $errors | sed "s?${tmpCurrentCommitDir}/??g")
     echo $errors
     message="The commit with message\n\n"
     message="$message$(git log -1 --pretty=%B)"
