@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Copyright (c) 2016 by Thomas Weber
+# Released under MIT License (see LICENSE file)
+
+# We want run LDoc to update the documentation, but we can't
+# add files to a commit that's current running. We use the method
+# presented in the following link to indicate to the post-commit
+# hook that we need to update and add the documentation.
+# http://stackoverflow.com/questions/3284292#12802592
+
+touch .commit

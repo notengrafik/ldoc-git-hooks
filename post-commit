@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# Copyright (c) 2016 by Thomas Weber
+# Released under MIT License (see LICENSE file)
+
+# We want to run LDoc to update the documentation, but we can't
+# add files to a commit that's currently running. We use the method
+# presented in the following link to check whether pre-commit ran
+# and we need to update and add the documentation.
+#   http://stackoverflow.com/questions/3284292#12802592
+# If we don't add/delete the .commit "flag" file, then git reset
+# would result in an infinitive loop if we abort the commit on
+# ldoc errors
+
+
+if [ -e ".commit" ]
+then
+  rm ".commit"
+  # The current state of the documentation may contain changes that
+  # were not committed yet. We don't want them to be in the current
+  # commit.  Therefore we remove the documentation and re-generate
+  # it from the state of the most recent commit.
+  rm -rf doc
+  # Because the working copy may contain stuff that is not yet part
+  # of the last commit, we checkout the last commit and re-generate
+  # the documentation from it.
+  tmpCurrentCommitDir=$(mktemp -d)
+
+  # We'll get an error "fatal: working tree [...] already exists" if we don't
+  # unset GIT_WORK_TREE. See http://stackoverflow.com/questions/34224729
+  unset GIT_WORK_TREE
+  git clone . "$tmpCurrentCommitDir"
+
+  # We run ldoc and check whether there is any output on stderr.
+  # If so, there is something wrong and we abort the commit.
+  errors=$(ldoc -iq "$tmpCurrentCommitDir" 2>&1 >/dev/null)
+  if [ "$errors" ]
+  then
+    echo $errors
+    message="The commit with message\n\n"
+    message="$message$(git log -1 --pretty=%B)"
+    message="$message""\n\ncaused the following problem with LDoc:"
+    message="$message\n\n$errors\n\n"
+    message="$message""Revert commit?"
+    if zenity --question --title="Commit problem" --text="$message"
+    then
+      git reset HEAD^
+    else
+      # Just pretend there were no errors
+      errors=""
+    fi
+  fi
+
+  if ! [ "$errors" ]
+  then
+    git add doc
+    # --no-verify to bypass pre-commit and avoid looping
+    git commit --amend -C HEAD --no-verify
+  fi
+
+  # Now we re-generate the documentation to represent the state of the
+  # working copy and get rid of the temporary clone.
+  #rm -rf "$tmpCurrentCommitDir"
+  ldoc -iq .
+fi
